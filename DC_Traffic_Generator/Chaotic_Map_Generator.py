@@ -27,6 +27,7 @@ def genDataset(d, seq_len):
             else:
                 x[i + 1] = x[i] - d * np.power((1 - x[i]) / (1 - d), m2)
         x = x[1:]  # unscaled data [0,1)
+        x_upscaled = x * 10
         # Check the number of zero crossings, to avoid "flat" data set generation
         ##########################################
         x_norm = x - 0.5
@@ -37,7 +38,7 @@ def genDataset(d, seq_len):
         if ZC < 10 and attempts == 10:
             raise ValueError("problem with data generation")
 
-    return x
+    return x_upscaled
 
 
 if __name__ == "__main__":
