@@ -19,8 +19,8 @@ from DC_Traffic_Generator.Chaotic_Map_Generator import genDataset
 N_ports = 2  # number of ports on the switch
 max_Queues = 3  # the maximum number of queues per port
 # N_streams = torch.randint(max_Queues, (N_ports,))  # number of streams on each port
-N_streams = [1, 3]
-Length = 1000  # sequence length
+N_streams = [3, 3]
+Length = 100  # sequence length
 alpha_high = 2  # alpha for high priority queues
 alpha_low = 1  # alpha for low priority queues
 B = 60  # full buffer capacity (for a single switch), 60 packets
@@ -28,11 +28,7 @@ Traffic = torch.zeros(N_ports, max_Queues, Length)
 # print(Q.shape)
 for i in range(N_ports):
     for j in range(N_streams[i]):
-        Traffic[i, j, :] = genDataset(d=0.2, seq_len=1000)  # generate 1/3 stream on port1
-        # Traffic[1, 0, :] = genDataset(d=0.2, seq_len=1000)  # generate 3 different streams on port2
-        # Traffic[1, 1, :] = genDataset(d=0.2, seq_len=1000)
-        # Traffic[1, 2, :] = genDataset(d=0.2, seq_len=1000)
-
+        Traffic[i, j, :] = genDataset(d=0.2, seq_len=Length)  # generate 1/3 stream on each port
 Q = torch.min(Traffic.sum((0, 1)), torch.ones(Length) * 60)
 
 Threshold_h = alpha_high * (B - Q)
@@ -43,34 +39,20 @@ Threshold_l = alpha_low * (B - Q)
 
 Time = range(0, len(Traffic[0, 0, :]))
 plt.figure()
-for k in range(N_ports * max_Queues):
-    plt.subplot(N_ports * max_Queues, 1, k)
-    if k == 0 or k == 3:
-        plt.plot(Time, Traffic[0, 0, :], Time, Threshold_h)
-        plt.legend(['q_1_h', 'T_1_h'])
-    plt.xlabel('Time [samples]')
-    plt.ylabel('Packets')
-    plt.grid()
-
-    # plt.subplot(4, 1, 2)
-    # plt.plot(Time, Traffic[1, 0, :], Time, Threshold_2h)
-    # plt.xlabel('Time [samples]')
-    # plt.ylabel('Packets')
-    # plt.grid()
-    # plt.legend(['q_2_h', 'T_2_h'])
-    # plt.subplot(4, 1, 3)
-    # plt.plot(Time, Traffic[1, 1, :], Time, Threshold_2l)
-    # plt.xlabel('Time [samples]')
-    # plt.ylabel('Packets')
-    # plt.grid()
-    # plt.legend(['q_2_l_1', 'T_2_l'])
-    # plt.subplot(4, 1, 4)
-    # plt.plot(Time, Traffic[1, 2, :], Time, Threshold_2l)
-    # plt.xlabel('Time [samples]')
-    # plt.ylabel('Packets')
-    # plt.grid()
-    # plt.legend(['q_2_l_2', 'T_2_l'])
-    plt.show()
+for i in range(N_ports):
+    for j in range(max_Queues):
+        plt.subplot(N_ports * max_Queues, 1, i * max_Queues + j + 1)
+        plt.plot(Time, Traffic[i, j, :])
+        if j == 0:
+            plt.plot(Time, Threshold_h)
+            plt.legend(['q_' + str(i) + '_h', 'T_' + str(i) + '_h'])
+        else:
+            plt.plot(Time, Threshold_l)
+            plt.legend(['q_' + str(i) + '_l_' + str(j), 'T_' + str(i) + '_l'])
+        plt.xlabel('Time [samples]')
+        plt.ylabel('Packets')
+        plt.grid()
+plt.show()
 
 # print(Threshold.shape)
 
