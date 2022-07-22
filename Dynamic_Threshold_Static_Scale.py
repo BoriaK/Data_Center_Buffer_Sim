@@ -19,16 +19,17 @@ from DC_Traffic_Generator.Chaotic_Map_Generator import genDataset
 N_ports = 2  # number of ports on the switch
 max_Queues = 3  # the maximum number of queues per port
 # N_streams = torch.randint(max_Queues, (N_ports,))  # number of streams on each port
-N_streams = [3, 3]
+N_streams = [3, 3]  # number of streams on each port
 Length = 100  # sequence length
 alpha_high = 2  # alpha for high priority queues
 alpha_low = 1  # alpha for low priority queues
 B = 60  # full buffer capacity (for a single switch), 60 packets
+Scale_init = 20
 Traffic = torch.zeros(N_ports, max_Queues, Length)
 # print(Q.shape)
 for i in range(N_ports):
     for j in range(N_streams[i]):
-        Traffic[i, j, :] = genDataset(d=0.2, seq_len=Length)  # generate 1/3 stream on each port
+        Traffic[i, j, :] = genDataset(d=0.2, seq_len=Length) * Scale_init  # generate 1/3 stream on each port
 Q = torch.min(Traffic.sum((0, 1)), torch.ones(Length) * 60)
 
 Threshold_h = alpha_high * (B - Q)
