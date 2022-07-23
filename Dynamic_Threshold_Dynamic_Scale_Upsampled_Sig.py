@@ -45,7 +45,7 @@ N_ports = 2  # number of ports on the switch
 max_Queues = 3  # the maximum number of queues per port
 # N_streams = [3, 3]  # number of streams on each port <= max_Queues, dim = N_ports
 N_streams = [3, 2]  # number of streams on each port <= max_Queues, dim = N_ports
-Length = 5  # sequence length
+Length = 10  # sequence length
 alpha_high = 2  # alpha for high priority queues
 alpha_low = 1  # alpha for low priority queues
 B = 60  # full buffer capacity (for a single switch), 60 packets
