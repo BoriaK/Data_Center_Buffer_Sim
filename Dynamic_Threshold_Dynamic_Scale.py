@@ -41,10 +41,10 @@ from DC_Traffic_Generator.Chaotic_Map_Generator import genDataset
 # for multiple streams
 
 N_ports = 2  # number of ports on the switch
-max_Queues = 2  # the maximum number of queues per port
+max_Queues = 3  # the maximum number of queues per port
 # N_streams = torch.randint(max_Queues, (N_ports,))  # number of streams on each port
 # N_streams = [3, 3]  # number of streams on each port <= max_Queues, dim = N_ports
-N_streams = [2, 1]  # number of streams on each port <= max_Queues, dim = N_ports
+N_streams = [3, 2]  # number of streams on each port <= max_Queues, dim = N_ports
 Length = 100  # sequence length
 alpha_high = 2  # alpha for high priority queues
 alpha_low = 1  # alpha for low priority queues
@@ -84,10 +84,28 @@ for k in range(Length):
     Scale_Array.append(New_Scale)
 
 Time = range(0, Length)
+# version 1: plot all ports
+# plt.figure()
+# for i in range(N_ports):
+#     for j in range(max_Queues):
+#         plt.subplot(N_ports * max_Queues, 1, i * max_Queues + j + 1)
+#         plt.plot(Time, Scaled_Traffic[i, j, :])
+#         if j == 0:
+#             plt.plot(Time, Threshold[0][:])
+#             plt.legend(['q_' + str(i) + '_h', 'T_' + str(i) + '_h'])
+#         else:
+#             plt.plot(Time, Threshold[1][:])
+#             plt.legend(['q_' + str(i) + '_l_' + str(j), 'T_' + str(i) + '_l'])
+#         plt.xlabel('Time [samples]')
+#         plt.ylabel('Packets')
+#         plt.grid()
+# plt.show()
+
+# version 2 plot active queues only:
 plt.figure()
 for i in range(N_ports):
-    for j in range(max_Queues):
-        plt.subplot(N_ports * max_Queues, 1, i * max_Queues + j + 1)
+    for j in range(N_streams[i]):
+        plt.subplot(sum(N_streams), 1, i * N_streams[i - 1] + j + 1)
         plt.plot(Time, Scaled_Traffic[i, j, :])
         if j == 0:
             plt.plot(Time, Threshold[0][:])
@@ -99,6 +117,7 @@ for i in range(N_ports):
         plt.ylabel('Packets')
         plt.grid()
 plt.show()
+
 
 # print(Threshold.shape)
 
