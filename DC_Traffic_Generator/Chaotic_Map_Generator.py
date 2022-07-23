@@ -9,7 +9,7 @@ import torch
 def genDataset(d, seq_len):
     attempts = 0
     ZC = 0
-    while ZC < 10 and attempts < 10:
+    while ZC < 0.1 * seq_len and attempts < 10:
         # 1.5 < m1,m2 <= 2
         m1 = 2
         m2 = 2
@@ -35,7 +35,7 @@ def genDataset(d, seq_len):
         ZC = (np.diff(np.sign(x_norm.data)) != 0).sum()
 
         attempts += 1
-        if ZC < 10 and attempts == 10:
+        if ZC < 0.1 * seq_len and attempts == 10:
             raise ValueError("problem with data generation")
 
     return x
