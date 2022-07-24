@@ -11,7 +11,6 @@ def genDataset(d, seq_len):
     m1 = 2
     m2 = 2
     # 0 < d < 1, small d -> mostly mice, large d -> mostly elephants
-    # d = 0.5
     if seq_len > 9:
         attempts = 0
         ZC = 0
