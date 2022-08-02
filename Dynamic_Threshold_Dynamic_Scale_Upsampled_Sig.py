@@ -7,10 +7,11 @@ import torch
 from DC_Traffic_Generator.Chaotic_Map_Generator import genDataset
 from additional_functions import UpsamleZOH
 
+
 # for one stream only:
 Length = 5  # sequence length
-alpha = 1
-B = 60
+alpha = 1  # Threshold slope
+B = 60  # total buffer size
 Scale_init = 60
 Traffic = genDataset(d=0.2, seq_len=Length)
 upsample_factor = 11
@@ -19,7 +20,7 @@ Scaled_Upsampled_Traffic = torch.zeros(Length * upsample_factor)
 Q = torch.zeros(Length * upsample_factor)
 Threshold = torch.zeros(Length * upsample_factor)
 Scale_Array = [Scale_init]
-for i in range(Length*upsample_factor):
+for i in range(Length * upsample_factor):
     Scaled_Upsampled_Traffic[i] = Upsampled_Traffic[i] * Scale_Array[i]
     Q[i] = torch.min(Scaled_Upsampled_Traffic[i], torch.ones(1) * 60)
     Threshold[i] = alpha * (B - Q[i])
@@ -40,6 +41,7 @@ plt.legend(['q_1', 'T_1'])
 plt.grid()
 plt.show()
 # print(Threshold)
+
 
 # for multiple streams
 
