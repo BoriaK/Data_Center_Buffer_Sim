@@ -12,14 +12,13 @@ Length = 1  # sequence length
 N_ports = 1  # number of ports on the switch
 max_Queues = 3  # the maximum number of queues per port
 # N_streams = [3, 2]  # number of streams on each port <= max_Queues, dim = N_ports
-N_streams = [2]
+N_streams = [3]
 alpha_high = 2  # alpha for high priority queues
 alpha_low = 1  # alpha for low priority queues
 B = 60  # total buffer size [packets]
-R_max = torch.ones(N_ports, max_Queues) * 50  # the initial Traffic arrival rate [packets/sec]
+# R_max = torch.ones(N_ports, max_Queues) * 50  # the initial Traffic arrival rate [packets/sec]
+R_max = torch.Tensor([[60, 100, 40]])  # for debug
 Traffic = torch.zeros(N_ports, max_Queues, Length)
-# Traffic = genDataset(d=0.2, seq_len=Length) * R_max  # incoming Traffic [Packets/sec]
-# Traffic = torch.Tensor([76.5542, 74.8363, 72.8576, 70.5553, 67.8460])  # for debug
 # Generate traffic on each port
 for i in range(N_ports):
     for j in range(N_streams[i]):
@@ -97,87 +96,119 @@ for k in range(Length):  # for each incoming stream in time t
                 if Delta_Arr[i, j, t] < 0:
                     states[i][j] = 'overshoot'
         # determine form of correction: low prioretie queue needs to be corrected first
-        if states[0][0] == 'transition' and states[0][1] == 'transition':
+        if states[0][0] == 'transition' and states[0][1] == 'transition' and states[0][2] == 'transition':
             state = 'transition'  # both queues in transition
-        elif states[0][0] == 'transition' and states[0][1] == 'overshoot':
+        elif states[0][0] == 'transition' and (states[0][1] == 'overshoot' or states[0][2] == 'overshoot'):
             state = 'overshoot_l'  # low queue in overshoot
             # need to correct low queue, then update Q(t) and re-calculate T(t), then re-calculate delta_H
-            Rates_Arr[i, j, t] = 0
-            # calculate the intersection point between High Priority Threshold and a specific Queue length
-            Intr = (Threshold[1, k * upsample_factor + t - 2] * Queue_i_Length_Arr[
-                i, j, k * upsample_factor + t - 1] -
-                    Threshold[1, k * upsample_factor + t - 1] * Queue_i_Length_Arr[
-                        i, j, k * upsample_factor + t - 2]) \
-                   / (Threshold[1, k * upsample_factor + t - 2] - Threshold[
-                1, k * upsample_factor + t - 1] +
-                      Queue_i_Length_Arr[i, j, k * upsample_factor + t - 1] - Queue_i_Length_Arr[
-                          i, j, k * upsample_factor + t - 2])
-            # Make the correction to Queue length, Threshold
-            Queue_Length_dt[i, j] = Intr - Queue_i_Length_Arr[i, j, k * upsample_factor + t - 1]
-            Queue_i_Length_Arr[i, j, k * upsample_factor + t] = Intr
-            Threshold[1, k * upsample_factor + t] = Queue_i_Length_Arr[i, j, k * upsample_factor + t]
-            # re-calculate delta:
-            Delta_Arr[i, j, t] = Threshold[1, k * upsample_factor + t] - \
-                                 Queue_i_Length_Arr[i, j, k * upsample_factor + t]
-            if Delta_Arr[i, j, t].round(decimals=2) == 0:
-                states[i][j] = 'steady'
-            # re-calculate Q(t) and the other Threshold
-            Q[k * upsample_factor + t] = Q[k * upsample_factor + t - 1] + Queue_Length_dt.sum((0, 1))
-            Threshold[0][k * upsample_factor + t] = alpha_high * (
-                    B - Q[k * upsample_factor + t])
-            # re-calculate other delta:
-            Delta_Arr[i, j - 1, t] = Threshold[0, k * upsample_factor + t] - \
-                                     Queue_i_Length_Arr[i, j, k * upsample_factor + t]
-            if Delta_Arr[i, j - 1, t].round(decimals=2) == 0:
-                states[i][j - 1] = 'steady'
-            elif Delta_Arr[i, j - 1, t].round(decimals=2) > 0:
-                states[i][j - 1] = 'transition'
-            else:
-                states[i][j - 1] = 'overshoot'
-        elif states[0][0] == 'overshoot' and states[0][1] == 'transition':
-            state = 'overshoot_h'  # high queue in overshoot
-        elif states[0][0] == 'overshoot' and states[0][1] == 'overshoot':
-            state = 'overshoot'  # both queues in overshoot
-            # need to correct high queue, then update Q(t) and re-calculate T(t), then re-calculate delta_L
-            Rates_Arr[i, j - 1, t] = 0
-            # calculate the intersection point between High Priority Threshold and a specific Queue length
-            Intr = (Threshold[0, k * upsample_factor + t - 2] * Queue_i_Length_Arr[
-                i, j - 1, k * upsample_factor + t - 1] -
-                    Threshold[0, k * upsample_factor + t - 1] * Queue_i_Length_Arr[
-                        i, j - 1, k * upsample_factor + t - 2]) \
-                   / (Threshold[0, k * upsample_factor + t - 2] - Threshold[
-                0, k * upsample_factor + t - 1] +
-                      Queue_i_Length_Arr[i, j - 1, k * upsample_factor + t - 1] - Queue_i_Length_Arr[
-                          i, j - 1, k * upsample_factor + t - 2])
-            # Make the correction to Queue length, Threshold
-            Queue_Length_dt[i, j - 1] = Intr - Queue_i_Length_Arr[i, j - 1, k * upsample_factor + t - 1]
-            Queue_i_Length_Arr[i, j - 1, k * upsample_factor + t] = Intr
-            # re-calculate Q(t) and the high Threshold:
+            for i in range(N_ports):
+                for j in range(N_streams[i]):
+                    if j != 0 and states[i][j] == 'overshoot':
+                        Rates_Arr[i, j, t] = 0
+                        if Delta_Arr[i, j, t-1] != 0:  # only if it wasn't in steady state already
+                            # calculate the intersection point between Low Priority Threshold and a specific Queue length
+                            Intr = (Threshold[1, k * upsample_factor + t - 2] * Queue_i_Length_Arr[
+                                i, j, k * upsample_factor + t - 1] -
+                                    Threshold[1, k * upsample_factor + t - 1] * Queue_i_Length_Arr[
+                                        i, j, k * upsample_factor + t - 2]) \
+                                   / (Threshold[1, k * upsample_factor + t - 2] - Threshold[
+                                1, k * upsample_factor + t - 1] +
+                                      Queue_i_Length_Arr[i, j, k * upsample_factor + t - 1] - Queue_i_Length_Arr[
+                                          i, j, k * upsample_factor + t - 2])
+
+                            # Make the correction to Queue length
+                            Queue_Length_dt[i, j] = Intr - Queue_i_Length_Arr[i, j, k * upsample_factor + t - 1]
+                            Queue_i_Length_Arr[i, j, k * upsample_factor + t] = Intr
+                        else:
+                            Queue_Length_dt[i, j] = 0
+
+                            # re-calculate Q(t) and the Thresholds:
             Q[k * upsample_factor + t] = Q[k * upsample_factor + t - 1] + Queue_Length_dt.sum((0, 1))
 
             Threshold[0, k * upsample_factor + t] = alpha_high * (B - Q[k * upsample_factor + t])
-            Queue_i_Length_Arr[i, j - 1, k * upsample_factor + t] = Threshold[0, k * upsample_factor + t]
+            Threshold[1, k * upsample_factor + t] = alpha_low * (B - Q[k * upsample_factor + t])
 
-            # re-calculate delta (just a formality):
-            Delta_Arr[i, j - 1, t] = Threshold[0, k * upsample_factor + t] - \
-                                     Queue_i_Length_Arr[i, j - 1, k * upsample_factor + t]
-            if Delta_Arr[i, j - 1, t].round(decimals=2) == 0:
-                states[i][j - 1] = 'steady'
-            # re-calculate low Threshold
+            # Update each queue length to be equal to the relevant Threshold
+            for i in range(N_ports):
+                for j in range(N_streams[i]):
+                    if j == 0:  # for high priority queue update delta only
+                        Delta_Arr[i, j, t] = Threshold[0, k * upsample_factor + t] - \
+                                             Queue_i_Length_Arr[i, j, k * upsample_factor + t]
+                    elif states[i][j] == 'overshoot':  # for low priority queue
+                        # update queue low length:
+                        Queue_i_Length_Arr[i, j, k * upsample_factor + t] = Threshold[1][k * upsample_factor + t]
+                        # re-calculate low delta:
+                        Delta_Arr[i, j, t] = Threshold[1, k * upsample_factor + t] - \
+                                             Queue_i_Length_Arr[i, j, k * upsample_factor + t]
 
-            Threshold[1][k * upsample_factor + t] = alpha_low * (
-                    B - Q[k * upsample_factor + t])
-            # update queue low length:
-            Queue_i_Length_Arr[i, j, k * upsample_factor + t] = Threshold[1][k * upsample_factor + t]
-            # re-calculate low delta:
-            Delta_Arr[i, j, t] = Threshold[1, k * upsample_factor + t] - \
-                                 Queue_i_Length_Arr[i, j, k * upsample_factor + t]
-            if Delta_Arr[i, j, t].round(decimals=2) == 0:
-                states[i][j] = 'steady'
-            elif Delta_Arr[i, j, t].round(decimals=2) > 0:
-                states[i][j] = 'transition'
-            else:
-                states[i][j] = 'overshoot'
+                    if Delta_Arr[i, j, t].round(decimals=2) == 0:
+                        states[i][j] = 'steady'
+                    elif Delta_Arr[i, j, t].round(decimals=2) > 0:
+                        states[i][j] = 'transition'
+                    else:
+                        states[i][j] = 'overshoot'
+        elif states[0][0] == 'overshoot' and states[0][1] == 'transition':
+            state = 'overshoot_h'  # high queue in overshoot
+        elif states[0][0] == 'overshoot' and states[0][1] == 'overshoot' and states[0][2] == 'overshoot':
+            state = 'overshoot'  # all queues in overshoot
+            # need to correct Intersection point for all queues
+            for i in range(N_ports):
+                for j in range(N_streams[i]):
+                    Rates_Arr[i, j, t] = 0
+                    if Delta_Arr[i, j, t - 1] != 0:
+                        if j == 0:  # for high priority queue
+                            # calculate the intersection point between High Priority Threshold and a specific Queue length
+                            Intr = (Threshold[0, k * upsample_factor + t - 2] * Queue_i_Length_Arr[
+                                i, j, k * upsample_factor + t - 1] -
+                                    Threshold[0, k * upsample_factor + t - 1] * Queue_i_Length_Arr[
+                                        i, j, k * upsample_factor + t - 2]) \
+                                   / (Threshold[0, k * upsample_factor + t - 2] - Threshold[
+                                0, k * upsample_factor + t - 1] +
+                                      Queue_i_Length_Arr[i, j, k * upsample_factor + t - 1] - Queue_i_Length_Arr[
+                                          i, j, k * upsample_factor + t - 2])
+                        else:
+                            # calculate the intersection point between Low Priority Threshold and a specific Queue length
+                            Intr = (Threshold[1, k * upsample_factor + t - 2] * Queue_i_Length_Arr[
+                                i, j, k * upsample_factor + t - 1] -
+                                    Threshold[1, k * upsample_factor + t - 1] * Queue_i_Length_Arr[
+                                        i, j, k * upsample_factor + t - 2]) \
+                                   / (Threshold[1, k * upsample_factor + t - 2] - Threshold[
+                                1, k * upsample_factor + t - 1] +
+                                      Queue_i_Length_Arr[i, j, k * upsample_factor + t - 1] - Queue_i_Length_Arr[
+                                          i, j, k * upsample_factor + t - 2])
+                        # Make the correction to Queue length, Threshold
+                        Queue_Length_dt[i, j] = Intr - Queue_i_Length_Arr[i, j, k * upsample_factor + t - 1]
+                        Queue_i_Length_Arr[i, j, k * upsample_factor + t] = Intr
+                    else:
+                        Queue_Length_dt[i, j] = 0
+
+                        # re-calculate Q(t) and the Thresholds:
+            Q[k * upsample_factor + t] = Q[k * upsample_factor + t - 1] + Queue_Length_dt.sum((0, 1))
+
+            Threshold[0, k * upsample_factor + t] = alpha_high * (B - Q[k * upsample_factor + t])
+            Threshold[1, k * upsample_factor + t] = alpha_low * (B - Q[k * upsample_factor + t])
+
+            # Update each queue length to be equal to the relevant Threshold
+            for i in range(N_ports):
+                for j in range(N_streams[i]):
+                    if j == 0:  # for high priority queue
+                        Queue_i_Length_Arr[i, j, k * upsample_factor + t] = Threshold[0, k * upsample_factor + t]
+                        # re-calculate delta (just a formality):
+                        Delta_Arr[i, j, t] = Threshold[0, k * upsample_factor + t] - \
+                                             Queue_i_Length_Arr[i, j, k * upsample_factor + t]
+                    else:
+                        # update queue low length:
+                        Queue_i_Length_Arr[i, j, k * upsample_factor + t] = Threshold[1][k * upsample_factor + t]
+                        # re-calculate low delta:
+                        Delta_Arr[i, j, t] = Threshold[1, k * upsample_factor + t] - \
+                                             Queue_i_Length_Arr[i, j, k * upsample_factor + t]
+
+                    if Delta_Arr[i, j, t].round(decimals=2) == 0:
+                        states[i][j] = 'steady'
+                    elif Delta_Arr[i, j, t].round(decimals=2) > 0:
+                        states[i][j] = 'transition'
+                    else:
+                        states[i][j] = 'overshoot'
 
         print('')
 
