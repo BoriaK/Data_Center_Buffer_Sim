@@ -18,8 +18,8 @@ alpha_low = 1  # alpha for low priority queues
 B = 60  # total buffer size [packets]
 C = 30  # Link Capacity - the rate of packets leaving the buffer
 # R_max = torch.ones(N_ports, max_Queues) * 100  # the initial Traffic arrival rate [packets/sec]
-# R_max = torch.Tensor([[50, 100]])  # for debug 2
-R_max = torch.Tensor([[50, 70]])  # for debug 1
+R_max = torch.Tensor([[50, 100]])  # for debug 2
+# R_max = torch.Tensor([[50, 70]])  # for debug 1
 Traffic = torch.zeros(N_ports, max_Queues, Length)
 # Generate traffic on each port
 for i in range(N_ports):
@@ -76,10 +76,11 @@ for k in range(Length):  # for each incoming stream in time t
                     # Qi(dt) = -C*dt
                     ################
         # calculate the Q(t) and Threshold at each time sample:
-        if k == 0 and t == 0:
-            Q[k * upsample_factor + t] = 0  # [Packets/sample]
-        else:
-            Q[k * upsample_factor + t] = Q[k * upsample_factor + t - 1] + Queue_Length_dt.sum((0, 1))
+        # if k == 0 and t == 0:
+        #     Q[k * upsample_factor + t] = 0  # [Packets/sample]
+        # else:
+        #     Q[k * upsample_factor + t] = Q[k * upsample_factor + t - 1] + Queue_Length_dt.sum((0, 1))
+        Q[k * upsample_factor + t] = Queue_i_Length_Arr[:, :, k * upsample_factor + t].sum(1)
         # Threshold can't be > alpha_c * B
         Threshold[0][k * upsample_factor + t] = torch.min(alpha_high * (
                 B - Q[k * upsample_factor + t]), torch.tensor(alpha_high * B))  # set high priority threshold
@@ -129,16 +130,20 @@ for k in range(Length):  # for each incoming stream in time t
                         Queue_i_Length_Arr[i, j, k * upsample_factor + t] = Intr
                     else:  # it was in steady state already
                         ########################################
-                        Rates_in_Arr[i, j, k * upsample_factor + t] = Delta_Arr[i, j, k * upsample_factor + t] / (1 / upsample_factor) + C
+                        Rates_in_Arr[i, j, k * upsample_factor + t] = Delta_Arr[i, j, k * upsample_factor + t] / (1 / upsample_factor)
                         Lost_Packets_dt_Arr[i, j, k * upsample_factor + t] = -Delta_Arr[i, j, k * upsample_factor + t]
                         if Rates_in_Arr[i, j, k * upsample_factor + t] >= -C:
-                            Queue_Length_dt[i, j] = 0  # it doesn't add new packets to total queue
+                            Queue_Length_dt[i, j] = Delta_Arr[i, j, k * upsample_factor + t]  # it doesn't add new packets to total queue
                         else:
-                            Queue_Length_dt[i, j] = C * 1/upsample_factor
+                            Queue_Length_dt[i, j] = -C * 1/upsample_factor
+                        Queue_i_Length_Arr[i, j, k * upsample_factor + t] = torch.max(Queue_i_Length_Arr[
+                                                                                i, j, k * upsample_factor + t - 1] +
+                                                                            Queue_Length_dt[i, j],
+                                                                            torch.tensor(0))
                             ########################################
         # re-calculate Q(t) and the Thresholds:
         if not (k == 0 and t == 0):
-            Q[k * upsample_factor + t] = Q[k * upsample_factor + t - 1] + Queue_Length_dt.sum((0, 1))
+            Q[k * upsample_factor + t] = Queue_i_Length_Arr[:, :, k * upsample_factor + t].sum(1)
             Threshold[0, k * upsample_factor + t] = torch.min(alpha_high * (B - Q[k * upsample_factor + t]),
                                                               torch.tensor(alpha_high * B))
             Threshold[1, k * upsample_factor + t] = torch.min(alpha_low * (B - Q[k * upsample_factor + t]),
