@@ -7,7 +7,7 @@ from DC_Traffic_Generator.Chaotic_Map_Generator import genDataset
 
 # in this model R(t) is R_in(t) - R_out(t)
 
-Length = 3  # sequence length (time frames)
+Length = 1  # sequence length (time frames)
 
 N_ports = 1  # number of ports on the switch
 max_Queues = 2  # the maximum number of queues per port
@@ -26,7 +26,8 @@ for i in range(N_ports):
     for j in range(N_streams[i]):
         # generate stream on each port
         # Traffic[i, j, :] = torch.ones(Length) * R_max[i, j]
-        Traffic[i, j, :] = torch.tensor([2, 0, 1]) * R_max[i, j]  # Special case: Q(t)>B
+        Traffic[i, j, :] = torch.tensor([2]) * R_max[i, j]  # Special case: Q(t)>B
+        # Traffic[i, j, :] = torch.tensor([2, 0, 1]) * R_max[i, j]  # Special case: Q(t)>B
         # Traffic[i, j, :] = genDataset(d=0.2, seq_len=Length) * R_max[i, j]
 
 # Traffic = torch.tensor([[[7.6419, 19.3214, 93.9851, 93.8721, 93.7547]]])
@@ -143,6 +144,10 @@ for k in range(Length):  # for each incoming stream in time t
                                                               torch.tensor(alpha_high * B))
             Threshold[1, k * upsample_factor + t] = torch.min(alpha_low * (B - Q[k * upsample_factor + t]),
                                                               torch.tensor(alpha_low * B))
+            ###################################
+            # add correction factor to threshold as proportion between the correction to q_i and the nessesarry correction to T_i
+            #
+            #################################
 
         # Update each queue length to be equal to the relevant Threshold
         ########need to update according to re-calculated queue_dt
