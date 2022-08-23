@@ -7,7 +7,7 @@ from DC_Traffic_Generator.Chaotic_Map_Generator import genDataset
 
 # in this model R(t) is R_in(t) - R_out(t)
 
-Length = 3  # sequence length (time frames)
+Length = 5  # sequence length (time frames)
 
 N_ports = 2  # number of ports on the switch
 max_Queues = 3  # the maximum number of queues per port
